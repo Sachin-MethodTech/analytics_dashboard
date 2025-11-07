@@ -9,9 +9,10 @@ interface AnalyticsData {
   query_params?: Record<string, unknown>
   purpose?: string
   date?: string
+  time?: string
 }
 
-type ColumnKey = 'date' | 'user' | 'endpoint' | 'purpose' | 'params' | 'app'
+type ColumnKey = 'date' | 'time' | 'user' | 'endpoint' | 'purpose' | 'params' | 'app'
 
 const DashboardPage = () => {
   const [data, setData] = useState<AnalyticsData[]>([])
@@ -29,7 +30,7 @@ const DashboardPage = () => {
   const [activeFilterTab, setActiveFilterTab] = useState<'users' | null>('users')
 
   // Columns selector state
-  const allFields: ColumnKey[] = ['date', 'user', 'endpoint', 'app', 'purpose', 'params']
+  const allFields: ColumnKey[] = ['date', 'time', 'user', 'endpoint', 'app', 'params']
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(allFields)
   const [columnsMenuOpen, setColumnsMenuOpen] = useState<boolean>(false)
   const columnsMenuRef = useRef<HTMLDivElement | null>(null)
@@ -157,6 +158,26 @@ const DashboardPage = () => {
         ))}
       </div>
     )
+  }
+
+  // Function to extract time from date string
+  const getTimeFromDate = (dateString?: string): string => {
+    if (!dateString) return '—'
+    
+    // Check if date string contains time (ISO format: YYYY-MM-DDTHH:mm:ss or with timezone)
+    const timeMatch = dateString.match(/T(\d{2}:\d{2}(?::\d{2})?(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2})?)/)
+    if (timeMatch) {
+      // Extract time portion (remove T and timezone info if present)
+      let time = timeMatch[1]
+      // Remove timezone info (Z or +HH:mm or -HH:mm)
+      time = time.replace(/Z|[+-]\d{2}:\d{2}$/, '')
+      // Remove milliseconds if present
+      time = time.replace(/\.\d{3}$/, '')
+      return time
+    }
+    
+    // If no time found, return dash
+    return '—'
   }
 
   // Function to get app name from endpoint
@@ -353,6 +374,9 @@ const DashboardPage = () => {
                     {visibleColumns.includes('date') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date</th>
                     )}
+                    {visibleColumns.includes('time') && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Time</th>
+                    )}
                     {visibleColumns.includes('user') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">User</th>
                     )}
@@ -362,9 +386,6 @@ const DashboardPage = () => {
                     {visibleColumns.includes('app') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">App</th>
                     )}
-                    {visibleColumns.includes('purpose') && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Purpose</th>
-                    )}
                     {visibleColumns.includes('params') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Params</th>
                     )}
@@ -373,10 +394,15 @@ const DashboardPage = () => {
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredData.map((item, index) => {
                     const normalizedDate = (item.date && item.date.slice(0, 10)) || tempDate
+                    // Use time field if available, otherwise extract from date
+                    const time = item.time || getTimeFromDate(item.date)
                     return (
                       <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
                         {visibleColumns.includes('date') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{normalizedDate}</td>
+                        )}
+                        {visibleColumns.includes('time') && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{time}</td>
                         )}
                         {visibleColumns.includes('user') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{item.user}</td>
@@ -386,9 +412,6 @@ const DashboardPage = () => {
                         )}
                         {visibleColumns.includes('app') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{getAppFromEndpoint(item.endpoint)}</td>
-                        )}
-                        {visibleColumns.includes('purpose') && (
-                          <td className="px-6 py-4 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 max-w-sm">{item.purpose || '—'}</td>
                         )}
                         {visibleColumns.includes('params') && (
                           <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{renderParams(item.query_params)}</td>
