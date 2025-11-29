@@ -12,7 +12,73 @@ interface AnalyticsData {
   time?: string
 }
 
-type ColumnKey = 'date' | 'time' | 'user' | 'endpoint' | 'purpose' | 'params' | 'app'
+type ColumnKey = 'datetime' | 'user' | 'endpoint' | 'purpose' | 'params' | 'app'
+
+// Function to parse datetime string in various formats and return timestamp
+const parseDateTime = (dateStr: string, timeStr?: string, fallbackDate?: string): number => {
+  // If date string contains both date and time (format: "YYYY-MM-DD HH:MM:SS")
+  if (dateStr && dateStr.includes(' ') && dateStr.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
+    // Convert "YYYY-MM-DD HH:MM:SS" to ISO format "YYYY-MM-DDTHH:MM:SS"
+    const isoFormat = dateStr.replace(' ', 'T')
+    const timestamp = Date.parse(isoFormat)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  // If date string is in ISO format (with T separator)
+  if (dateStr && dateStr.includes('T')) {
+    const timestamp = Date.parse(dateStr)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  // If we have separate date and time fields
+  if (dateStr && timeStr) {
+    // Normalize date to YYYY-MM-DD format
+    const normalizedDate = dateStr.slice(0, 10)
+    // Combine date and time in ISO format
+    const combined = `${normalizedDate}T${timeStr}`
+    const timestamp = Date.parse(combined)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  // If we only have date (YYYY-MM-DD)
+  if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const normalizedDate = dateStr.slice(0, 10)
+    const timestamp = Date.parse(normalizedDate)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  // If we only have time, use fallback date
+  if (timeStr && fallbackDate) {
+    const combined = `${fallbackDate}T${timeStr}`
+    const timestamp = Date.parse(combined)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  // If we have date but no time, use start of day
+  if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const normalizedDate = dateStr.slice(0, 10)
+    const timestamp = Date.parse(`${normalizedDate}T00:00:00`)
+    if (!Number.isNaN(timestamp)) {
+      return timestamp
+    }
+  }
+
+  return Number.NEGATIVE_INFINITY
+}
+
+const getSortTimestamp = (item: AnalyticsData, fallbackDate: string): number => {
+  return parseDateTime(item.date || '', item.time, fallbackDate)
+}
 
 const DashboardPage = () => {
   const [data, setData] = useState<AnalyticsData[]>([])
@@ -30,10 +96,16 @@ const DashboardPage = () => {
   const [activeFilterTab, setActiveFilterTab] = useState<'users' | null>('users')
 
   // Columns selector state
-  const allFields: ColumnKey[] = ['date', 'time', 'user', 'endpoint', 'app', 'params']
+  const allFields: ColumnKey[] = ['datetime', 'user', 'endpoint', 'app', 'params']
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(allFields)
   const [columnsMenuOpen, setColumnsMenuOpen] = useState<boolean>(false)
   const columnsMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{ key: 'datetime'; direction: 'asc' | 'desc' }>({
+    key: 'datetime',
+    direction: 'desc',
+  })
 
   // Ref for click-outside behavior
   const filterMenuRef = useRef<HTMLDivElement | null>(null)
@@ -94,14 +166,83 @@ const DashboardPage = () => {
   }, [data])
 
   const filteredData = useMemo(() => {
-    return (data || []).filter(item => {
+    const filtered = (data || []).filter(item => {
       const matchesSelectedUsers = selectedUsers.length > 0 ? selectedUsers.includes(item.user) : true
       const normalizedDate = (item.date && item.date.slice(0, 10)) || tempDate
       // Date filter disabled for now
       const matchesDate = true // dateFilter ? normalizedDate === dateFilter : true
       return matchesSelectedUsers && matchesDate
     })
-  }, [data, selectedUsers, /*dateFilter,*/ tempDate])
+
+    const compareItems = (a: AnalyticsData, b: AnalyticsData) => {
+      if (sortConfig.key === 'datetime') {
+        const aValue = getSortTimestamp(a, tempDate)
+        const bValue = getSortTimestamp(b, tempDate)
+        
+        // For DESC (descending): larger timestamps come first (latest first)
+        // For ASC (ascending): smaller timestamps come first (oldest first)
+        if (sortConfig.direction === 'desc') {
+          // Descending: aValue > bValue means a is newer, so a should come first (return negative)
+          return bValue - aValue
+        } else {
+          // Ascending: aValue < bValue means a is older, so a should come first (return negative)
+          return aValue - bValue
+        }
+      }
+
+      return 0
+    }
+
+    return filtered.slice().sort(compareItems)
+  }, [data, selectedUsers, /*dateFilter,*/ tempDate, sortConfig])
+
+  const handleSort = (column: 'datetime') => {
+    setSortConfig(prev => {
+      if (prev.key === column) {
+        return {
+          key: column,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        }
+      }
+      return { key: column, direction: 'asc' }
+    })
+  }
+
+  const renderSortIcon = (column: 'datetime') => {
+    if (sortConfig.key !== column) {
+      return <span className="text-gray-400">↕</span>
+    }
+    return sortConfig.direction === 'asc' ? <span>▲</span> : <span>▼</span>
+  }
+
+  // Function to format date and time together
+  const formatDateTime = (item: AnalyticsData): string => {
+    // If date already contains full datetime in "YYYY-MM-DD HH:MM:SS" format
+    if (item.date && item.date.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
+      return item.date
+    }
+    
+    // If date contains ISO format with T separator
+    if (item.date && item.date.includes('T')) {
+      // Convert ISO format to "YYYY-MM-DD HH:MM:SS"
+      const isoDate = new Date(item.date)
+      if (!Number.isNaN(isoDate.getTime())) {
+        const dateStr = isoDate.toISOString().slice(0, 10)
+        const timeStr = isoDate.toTimeString().slice(0, 8)
+        return `${dateStr} ${timeStr}`
+      }
+    }
+    
+    // Otherwise, combine separate date and time fields
+    const normalizedDate = (item.date && item.date.slice(0, 10)) || tempDate
+    const time = item.time || getTimeFromDate(item.date)
+    
+    if (time === '—') {
+      return normalizedDate
+    }
+    
+    return `${normalizedDate} ${time}`
+  }
 
   const renderValue = (value: unknown) => {
     // If value is a string that looks like a JSON array, attempt to parse
@@ -371,11 +512,16 @@ const DashboardPage = () => {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-800/60">
                   <tr>
-                    {visibleColumns.includes('date') && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Date</th>
-                    )}
-                    {visibleColumns.includes('time') && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">Time</th>
+                    {visibleColumns.includes('datetime') && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                        <button
+                          type="button"
+                          onClick={() => handleSort('datetime')}
+                          className="inline-flex items-center gap-1 hover:text-gray-900 dark:hover:text-white"
+                        >
+                          Date & Time {renderSortIcon('datetime')}
+                        </button>
+                      </th>
                     )}
                     {visibleColumns.includes('user') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">User</th>
@@ -393,16 +539,10 @@ const DashboardPage = () => {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredData.map((item, index) => {
-                    const normalizedDate = (item.date && item.date.slice(0, 10)) || tempDate
-                    // Use time field if available, otherwise extract from date
-                    const time = item.time || getTimeFromDate(item.date)
                     return (
                       <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
-                        {visibleColumns.includes('date') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{normalizedDate}</td>
-                        )}
-                        {visibleColumns.includes('time') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{time}</td>
+                        {visibleColumns.includes('datetime') && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDateTime(item)}</td>
                         )}
                         {visibleColumns.includes('user') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{item.user}</td>
