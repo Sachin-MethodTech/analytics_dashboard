@@ -43,6 +43,9 @@ export async function GET() {
     console.log("Fetching data from:", url)
     const response = await fetch(url, {
       cache: 'no-store', // Ensure fresh data on each request
+      headers: {
+        "x-frontend-token": "methodtech-vercel-2025",
+      },
     })
     
     console.log("Response status:", response.status, response.statusText)
