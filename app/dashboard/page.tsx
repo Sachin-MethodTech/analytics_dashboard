@@ -116,7 +116,11 @@ const DashboardPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true)
-        const response = await fetch('/api/get-details')
+        const response = await fetch('/api/get-details', {
+          headers: {
+            "x-frontend-token": "methodtech-vercel-2025",
+          }
+        })
         if (!response.ok) {
           throw new Error(`Failed to fetch data: ${response.statusText}`)
         }
