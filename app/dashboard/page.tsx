@@ -641,13 +641,13 @@ const DashboardPage = () => {
                     // Determine the first visible column to add the expand icon
                     const firstVisibleColumn = visibleColumns[0]
                     
-                    // Render expand icon inline with content
+                    // Render expand icon inline with content (after content)
                     const renderExpandIcon = () => {
                       if (!needsExpansion) return null
                       return (
                         <button
                           onClick={() => toggleRowExpand(index)}
-                          className="inline-flex items-center justify-center w-5 h-5 mr-2 rounded-full border border-gray-400 dark:border-gray-500 text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors flex-shrink-0"
+                          className="inline-flex items-center justify-center w-5 h-5 ml-2 rounded-full border border-gray-400 dark:border-gray-500 text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors flex-shrink-0"
                           title={isExpanded ? 'Collapse row' : `Expand row (+${paramsRowCount - 1} more)`}
                         >
                           {isExpanded ? (
@@ -668,40 +668,40 @@ const DashboardPage = () => {
                         {visibleColumns.includes('datetime') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
                             <div className="flex items-center">
-                              {firstVisibleColumn === 'datetime' && renderExpandIcon()}
                               {formatDateTime(item)}
+                              {firstVisibleColumn === 'datetime' && renderExpandIcon()}
                             </div>
                           </td>
                         )}
                         {visibleColumns.includes('user') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                             <div className="flex items-center">
-                              {firstVisibleColumn === 'user' && renderExpandIcon()}
                               {item.user}
+                              {firstVisibleColumn === 'user' && renderExpandIcon()}
                             </div>
                           </td>
                         )}
                         {visibleColumns.includes('endpoint') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">
                             <div className="flex items-center">
-                              {firstVisibleColumn === 'endpoint' && renderExpandIcon()}
                               {item.endpoint}
+                              {firstVisibleColumn === 'endpoint' && renderExpandIcon()}
                             </div>
                           </td>
                         )}
                         {visibleColumns.includes('app') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                             <div className="flex items-center">
-                              {firstVisibleColumn === 'app' && renderExpandIcon()}
                               {getAppFromEndpoint(item.endpoint)}
+                              {firstVisibleColumn === 'app' && renderExpandIcon()}
                             </div>
                           </td>
                         )}
                         {visibleColumns.includes('params') && (
                           <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
                             <div className="flex items-start">
-                              {firstVisibleColumn === 'params' && renderExpandIcon()}
                               {renderParams(item.query_params, index)}
+                              {firstVisibleColumn === 'params' && renderExpandIcon()}
                             </div>
                           </td>
                         )}
