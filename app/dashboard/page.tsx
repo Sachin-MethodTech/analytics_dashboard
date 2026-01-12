@@ -25,7 +25,7 @@ const formatToIST = (date: Date): string => {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
+    hour12: true,
   }
   
   const formatter = new Intl.DateTimeFormat('en-CA', options) // en-CA gives YYYY-MM-DD format
@@ -39,8 +39,9 @@ const formatToIST = (date: Date): string => {
   const hour = getPart('hour')
   const minute = getPart('minute')
   const second = getPart('second')
+  const dayPeriod = getPart('dayPeriod') // AM or PM
   
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  return `${year}-${month}-${day} ${hour}:${minute}:${second} ${dayPeriod}`
 }
 
 // Function to parse datetime string in various formats and return timestamp
