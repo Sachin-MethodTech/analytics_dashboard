@@ -14,6 +14,35 @@ interface AnalyticsData {
 
 type ColumnKey = 'datetime' | 'user' | 'endpoint' | 'purpose' | 'params' | 'app'
 
+// Function to convert a Date to IST (Indian Standard Time, UTC+5:30) formatted string
+const formatToIST = (date: Date): string => {
+  // Use Intl.DateTimeFormat with Asia/Kolkata timezone for IST
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }
+  
+  const formatter = new Intl.DateTimeFormat('en-CA', options) // en-CA gives YYYY-MM-DD format
+  const parts = formatter.formatToParts(date)
+  
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '00'
+  
+  const year = getPart('year')
+  const month = getPart('month')
+  const day = getPart('day')
+  const hour = getPart('hour')
+  const minute = getPart('minute')
+  const second = getPart('second')
+  
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+}
+
 // Function to parse datetime string in various formats and return timestamp
 const parseDateTime = (dateStr: string, timeStr?: string, fallbackDate?: string): number => {
   // If date string contains both date and time (format: "YYYY-MM-DD HH:MM:SS")
@@ -100,6 +129,9 @@ const DashboardPage = () => {
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(allFields)
   const [columnsMenuOpen, setColumnsMenuOpen] = useState<boolean>(false)
   const columnsMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Track expanded params rows (by index)
+  const [expandedParamsRows, setExpandedParamsRows] = useState<Set<number>>(new Set())
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: 'datetime'; direction: 'asc' | 'desc' }>({
@@ -219,21 +251,26 @@ const DashboardPage = () => {
     return sortConfig.direction === 'asc' ? <span>▲</span> : <span>▼</span>
   }
 
-  // Function to format date and time together
+  // Function to format date and time together (converts to IST)
   const formatDateTime = (item: AnalyticsData): string => {
     // If date already contains full datetime in "YYYY-MM-DD HH:MM:SS" format
+    // Treat it as UTC and convert to IST
     if (item.date && item.date.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)) {
-      return item.date
+      // Convert "YYYY-MM-DD HH:MM:SS" to ISO format for parsing as UTC
+      const isoFormat = item.date.replace(' ', 'T') + 'Z' // Append Z to treat as UTC
+      const utcDate = new Date(isoFormat)
+      if (!Number.isNaN(utcDate.getTime())) {
+        return formatToIST(utcDate)
+      }
+      return item.date // Fallback if parsing fails
     }
     
     // If date contains ISO format with T separator
     if (item.date && item.date.includes('T')) {
-      // Convert ISO format to "YYYY-MM-DD HH:MM:SS"
+      // Parse ISO format and convert to IST
       const isoDate = new Date(item.date)
       if (!Number.isNaN(isoDate.getTime())) {
-        const dateStr = isoDate.toISOString().slice(0, 10)
-        const timeStr = isoDate.toTimeString().slice(0, 8)
-        return `${dateStr} ${timeStr}`
+        return formatToIST(isoDate)
       }
     }
     
@@ -243,6 +280,13 @@ const DashboardPage = () => {
     
     if (time === '—') {
       return normalizedDate
+    }
+    
+    // Combine and convert to IST
+    const combinedDateTime = `${normalizedDate}T${time}Z` // Treat as UTC
+    const utcDate = new Date(combinedDateTime)
+    if (!Number.isNaN(utcDate.getTime())) {
+      return formatToIST(utcDate)
     }
     
     return `${normalizedDate} ${time}`
@@ -285,7 +329,19 @@ const DashboardPage = () => {
     return <span className="break-all">{String(value ?? '')}</span>
   }
 
-  const renderParams = (params?: Record<string, unknown>) => {
+  const toggleParamsExpand = (rowIndex: number) => {
+    setExpandedParamsRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(rowIndex)) {
+        newSet.delete(rowIndex)
+      } else {
+        newSet.add(rowIndex)
+      }
+      return newSet
+    })
+  }
+
+  const renderParams = (params?: Record<string, unknown>, rowIndex?: number) => {
     if (!params) {
       return <span className="text-gray-400">—</span>
     }
@@ -293,14 +349,41 @@ const DashboardPage = () => {
     if (entries.length === 0) {
       return <span className="text-gray-400">—</span>
     }
+
+    const isExpanded = rowIndex !== undefined && expandedParamsRows.has(rowIndex)
+    const hasMultipleEntries = entries.length > 1
+    const displayEntries = isExpanded ? entries : entries.slice(0, 1)
+
     return (
       <div className="space-y-1">
-        {entries.map(([key, value]) => (
+        {displayEntries.map(([key, value]) => (
           <div key={key} className="text-sm text-gray-900 dark:text-gray-100">
             <span className="font-medium text-gray-600 dark:text-gray-300">{key}:</span>{' '}
             {renderValue(value)}
           </div>
         ))}
+        {hasMultipleEntries && (
+          <button
+            onClick={() => rowIndex !== undefined && toggleParamsExpand(rowIndex)}
+            className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mt-1 cursor-pointer"
+          >
+            {isExpanded ? (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Show less
+              </>
+            ) : (
+              <>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                +{entries.length - 1} more
+              </>
+            )}
+          </button>
+        )}
       </div>
     )
   }
@@ -558,7 +641,7 @@ const DashboardPage = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{getAppFromEndpoint(item.endpoint)}</td>
                         )}
                         {visibleColumns.includes('params') && (
-                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{renderParams(item.query_params)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{renderParams(item.query_params, index)}</td>
                         )}
                       </tr>
                     )
