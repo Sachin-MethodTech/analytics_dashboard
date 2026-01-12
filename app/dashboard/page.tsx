@@ -292,41 +292,62 @@ const DashboardPage = () => {
     return `${normalizedDate} ${time}`
   }
 
-  const renderValue = (value: unknown) => {
-    // If value is a string that looks like a JSON array, attempt to parse
+  // Helper to parse string that might be JSON
+  const tryParseJSON = (value: unknown): unknown => {
     if (typeof value === 'string') {
       const trimmed = value.trim()
       if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
         try {
-          const parsed = JSON.parse(trimmed)
-          return renderValue(parsed)
+          return JSON.parse(trimmed)
         } catch {
-          // fall through to render as plain string
+          return value
         }
       }
-      return <span className="break-all">{trimmed}</span>
     }
+    return value
+  }
 
-    // Array of arrays: show each inner array on its own line
-    if (Array.isArray(value) && value.every(v => Array.isArray(v))) {
-      return (
-        <div className="space-y-1">
-          {(value as unknown[]).map((inner, idx) => (
-            <div key={idx} className="break-all">{JSON.stringify(inner)}</div>
-          ))}
-        </div>
-      )
+  // Count total displayable rows for a params object
+  const countTotalRows = (params: Record<string, unknown>): number => {
+    let count = 0
+    const entries = Object.entries(params).filter(([key]) => key !== 'user')
+    for (const [, value] of entries) {
+      const parsed = tryParseJSON(value)
+      // If it's an array of arrays, each inner array is a row
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(v => Array.isArray(v))) {
+        count += parsed.length
+      } else {
+        count += 1
+      }
     }
-    // Generic array: compact JSON
-    if (Array.isArray(value)) {
-      return <span className="break-all">{JSON.stringify(value)}</span>
+    return count
+  }
+
+  // Flatten params into displayable rows: { key, displayValue, isArrayItem }
+  const flattenParamsToRows = (params: Record<string, unknown>): Array<{ key: string; displayValue: string; isFirstOfKey: boolean }> => {
+    const rows: Array<{ key: string; displayValue: string; isFirstOfKey: boolean }> = []
+    const entries = Object.entries(params).filter(([key]) => key !== 'user')
+    
+    for (const [key, value] of entries) {
+      const parsed = tryParseJSON(value)
+      // If it's an array of arrays, each inner array becomes a row
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(v => Array.isArray(v))) {
+        parsed.forEach((inner, idx) => {
+          rows.push({
+            key,
+            displayValue: JSON.stringify(inner),
+            isFirstOfKey: idx === 0,
+          })
+        })
+      } else if (Array.isArray(parsed)) {
+        rows.push({ key, displayValue: JSON.stringify(parsed), isFirstOfKey: true })
+      } else if (parsed && typeof parsed === 'object') {
+        rows.push({ key, displayValue: JSON.stringify(parsed), isFirstOfKey: true })
+      } else {
+        rows.push({ key, displayValue: String(parsed ?? ''), isFirstOfKey: true })
+      }
     }
-    // Objects: stringify compactly
-    if (value && typeof value === 'object') {
-      return <span className="break-all">{JSON.stringify(value)}</span>
-    }
-    // Primitives
-    return <span className="break-all">{String(value ?? '')}</span>
+    return rows
   }
 
   const toggleParamsExpand = (rowIndex: number) => {
@@ -351,18 +372,22 @@ const DashboardPage = () => {
     }
 
     const isExpanded = rowIndex !== undefined && expandedParamsRows.has(rowIndex)
-    const hasMultipleEntries = entries.length > 1
-    const displayEntries = isExpanded ? entries : entries.slice(0, 1)
+    const allRows = flattenParamsToRows(params)
+    const totalRows = allRows.length
+    const hasMultipleRows = totalRows > 1
+    const displayRows = isExpanded ? allRows : allRows.slice(0, 1)
 
     return (
       <div className="space-y-1">
-        {displayEntries.map(([key, value]) => (
-          <div key={key} className="text-sm text-gray-900 dark:text-gray-100">
-            <span className="font-medium text-gray-600 dark:text-gray-300">{key}:</span>{' '}
-            {renderValue(value)}
+        {displayRows.map((row, idx) => (
+          <div key={`${row.key}-${idx}`} className="text-sm text-gray-900 dark:text-gray-100">
+            {row.isFirstOfKey && (
+              <span className="font-medium text-gray-600 dark:text-gray-300">{row.key}:</span>
+            )}{' '}
+            <span className="break-all">{row.displayValue}</span>
           </div>
         ))}
-        {hasMultipleEntries && (
+        {hasMultipleRows && (
           <button
             onClick={() => rowIndex !== undefined && toggleParamsExpand(rowIndex)}
             className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mt-1 cursor-pointer"
@@ -379,7 +404,7 @@ const DashboardPage = () => {
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
-                +{entries.length - 1} more
+                +{totalRows - 1} more
               </>
             )}
           </button>
