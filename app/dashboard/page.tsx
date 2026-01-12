@@ -130,8 +130,8 @@ const DashboardPage = () => {
   const [columnsMenuOpen, setColumnsMenuOpen] = useState<boolean>(false)
   const columnsMenuRef = useRef<HTMLDivElement | null>(null)
 
-  // Track expanded params rows (by index)
-  const [expandedParamsRows, setExpandedParamsRows] = useState<Set<number>>(new Set())
+  // Track expanded rows (by index)
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
   // Sorting state
   const [sortConfig, setSortConfig] = useState<{ key: 'datetime'; direction: 'asc' | 'desc' }>({
@@ -350,8 +350,8 @@ const DashboardPage = () => {
     return rows
   }
 
-  const toggleParamsExpand = (rowIndex: number) => {
-    setExpandedParamsRows(prev => {
+  const toggleRowExpand = (rowIndex: number) => {
+    setExpandedRows(prev => {
       const newSet = new Set(prev)
       if (newSet.has(rowIndex)) {
         newSet.delete(rowIndex)
@@ -360,6 +360,13 @@ const DashboardPage = () => {
       }
       return newSet
     })
+  }
+
+  // Check if a row needs expansion (has params with multiple rows)
+  const rowNeedsExpansion = (item: AnalyticsData): boolean => {
+    if (!item.query_params) return false
+    const allRows = flattenParamsToRows(item.query_params)
+    return allRows.length > 1
   }
 
   const renderParams = (params?: Record<string, unknown>, rowIndex?: number) => {
@@ -371,10 +378,8 @@ const DashboardPage = () => {
       return <span className="text-gray-400">—</span>
     }
 
-    const isExpanded = rowIndex !== undefined && expandedParamsRows.has(rowIndex)
+    const isExpanded = rowIndex !== undefined && expandedRows.has(rowIndex)
     const allRows = flattenParamsToRows(params)
-    const totalRows = allRows.length
-    const hasMultipleRows = totalRows > 1
     const displayRows = isExpanded ? allRows : allRows.slice(0, 1)
 
     return (
@@ -387,28 +392,6 @@ const DashboardPage = () => {
             <span className="break-all">{row.displayValue}</span>
           </div>
         ))}
-        {hasMultipleRows && (
-          <button
-            onClick={() => rowIndex !== undefined && toggleParamsExpand(rowIndex)}
-            className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 mt-1 cursor-pointer"
-          >
-            {isExpanded ? (
-              <>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-                Show less
-              </>
-            ) : (
-              <>
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-                +{totalRows - 1} more
-              </>
-            )}
-          </button>
-        )}
       </div>
     )
   }
@@ -624,6 +607,7 @@ const DashboardPage = () => {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-800/60">
                   <tr>
+                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider w-10"></th>
                     {visibleColumns.includes('datetime') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                         <button
@@ -651,8 +635,31 @@ const DashboardPage = () => {
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredData.map((item, index) => {
+                    const needsExpansion = rowNeedsExpansion(item)
+                    const isExpanded = expandedRows.has(index)
+                    const paramsRowCount = item.query_params ? flattenParamsToRows(item.query_params).length : 0
+                    
                     return (
                       <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
+                        <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 w-10">
+                          {needsExpansion && (
+                            <button
+                              onClick={() => toggleRowExpand(index)}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400 cursor-pointer transition-colors"
+                              title={isExpanded ? 'Collapse row' : `Expand row (+${paramsRowCount - 1} more)`}
+                            >
+                              {isExpanded ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                        </td>
                         {visibleColumns.includes('datetime') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDateTime(item)}</td>
                         )}
