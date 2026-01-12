@@ -607,7 +607,6 @@ const DashboardPage = () => {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
                 <thead className="bg-gray-50 dark:bg-gray-800/60">
                   <tr>
-                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider w-10"></th>
                     {visibleColumns.includes('datetime') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                         <button
@@ -639,41 +638,72 @@ const DashboardPage = () => {
                     const isExpanded = expandedRows.has(index)
                     const paramsRowCount = item.query_params ? flattenParamsToRows(item.query_params).length : 0
                     
+                    // Determine the first visible column to add the expand icon
+                    const firstVisibleColumn = visibleColumns[0]
+                    
+                    // Render expand icon inline with content
+                    const renderExpandIcon = () => {
+                      if (!needsExpansion) return null
+                      return (
+                        <button
+                          onClick={() => toggleRowExpand(index)}
+                          className="inline-flex items-center justify-center w-5 h-5 mr-2 rounded-full border border-gray-400 dark:border-gray-500 text-gray-500 dark:text-gray-400 hover:border-gray-600 dark:hover:border-gray-300 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer transition-colors flex-shrink-0"
+                          title={isExpanded ? 'Collapse row' : `Expand row (+${paramsRowCount - 1} more)`}
+                        >
+                          {isExpanded ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                            </svg>
+                          )}
+                        </button>
+                      )
+                    }
+                    
                     return (
                       <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors">
-                        <td className="px-2 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 w-10">
-                          {needsExpansion && (
-                            <button
-                              onClick={() => toggleRowExpand(index)}
-                              className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-blue-600 dark:text-blue-400 cursor-pointer transition-colors"
-                              title={isExpanded ? 'Collapse row' : `Expand row (+${paramsRowCount - 1} more)`}
-                            >
-                              {isExpanded ? (
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                </svg>
-                              ) : (
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
-                              )}
-                            </button>
-                          )}
-                        </td>
                         {visibleColumns.includes('datetime') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDateTime(item)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
+                            <div className="flex items-center">
+                              {firstVisibleColumn === 'datetime' && renderExpandIcon()}
+                              {formatDateTime(item)}
+                            </div>
+                          </td>
                         )}
                         {visibleColumns.includes('user') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{item.user}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            <div className="flex items-center">
+                              {firstVisibleColumn === 'user' && renderExpandIcon()}
+                              {item.user}
+                            </div>
+                          </td>
                         )}
                         {visibleColumns.includes('endpoint') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">{item.endpoint}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">
+                            <div className="flex items-center">
+                              {firstVisibleColumn === 'endpoint' && renderExpandIcon()}
+                              {item.endpoint}
+                            </div>
+                          </td>
                         )}
                         {visibleColumns.includes('app') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{getAppFromEndpoint(item.endpoint)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            <div className="flex items-center">
+                              {firstVisibleColumn === 'app' && renderExpandIcon()}
+                              {getAppFromEndpoint(item.endpoint)}
+                            </div>
+                          </td>
                         )}
                         {visibleColumns.includes('params') && (
-                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{renderParams(item.query_params, index)}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                            <div className="flex items-start">
+                              {firstVisibleColumn === 'params' && renderExpandIcon()}
+                              {renderParams(item.query_params, index)}
+                            </div>
+                          </td>
                         )}
                       </tr>
                     )
