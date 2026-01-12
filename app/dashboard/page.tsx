@@ -491,7 +491,6 @@ const DashboardPage = () => {
         <div className="mb-6 sm:mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">User Analytics Dashboard</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Filter by user. Columns selectable. Data from backend API.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             {/* Unified Filters menu */}
